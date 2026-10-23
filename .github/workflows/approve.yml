@@ -1,15 +1,13 @@
 name: Approve
 
 on:
-  schedule:
-    - cron: '0 0 * * 0'
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
   approve:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GHP }}
