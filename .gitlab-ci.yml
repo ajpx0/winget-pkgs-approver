@@ -1,0 +1,37 @@
+variables:
+  IDS:
+    value: ""
+    description: 承認するパッケージID（スペース区切り）
+
+approve:
+  image: alpine:3.20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "api"
+  variables:
+    GH_TOKEN: $GHP
+  before_script:
+    - apk add --no-cache bash github-cli jq
+  script:
+    - |
+      bash <<'EOF'
+      set +e
+      me=$(gh api user --jq .login)
+      printf '| ID | PR |\n|---|---|\n' > summary.md
+      for id in $IDS; do
+        gh pr list -R microsoft/winget-pkgs --state all --author wingetbot --search "$id in:title" --limit 100 --json number,title,author,latestReviews |
+          jq -r --arg id "$id" --arg me "$me" '.[]
+            | select(.title | split(" ") | index($id))
+            | select([.latestReviews[] | select(.author.login == $me and .state == "APPROVED")] | length == 0)
+            | .number' |
+          while read -r n; do
+            gh pr review "$n" -R microsoft/winget-pkgs --approve && echo "✓ Approved https://github.com/microsoft/winget-pkgs/pull/$n" &&
+              echo "| $id | https://github.com/microsoft/winget-pkgs/pull/$n |" >> summary.md
+          done
+      done
+      cat summary.md
+      exit 0
+      EOF
+  artifacts:
+    when: always
+    paths:
+      - summary.md
